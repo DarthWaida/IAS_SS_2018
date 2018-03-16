@@ -6,7 +6,8 @@ import vrep
 import numpy as np
 import time
 
-#def wheelVel(forwBackVel, leftRightVel, rotVel):
+def wheelVel(forwBackVel, leftRightVel, rotVel):
+    return np.array([-forwBackVel-leftRightVel+rotVel, -forwBackVel +leftRightVel+rotVel, -forwBackVel-leftRightVel-rotVel, -forwBackVel+leftRightVel-rotVel])
 #    write your function here
 
 def main():
