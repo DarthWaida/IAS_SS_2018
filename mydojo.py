@@ -115,7 +115,7 @@ def getSensorData(clientID, visionSensors):
 def formatSensorData(clientID, visionSensor):
     res, aux, auxD = vrep.simxReadVisionSensor(clientID, visionSensor, vrep.simx_opmode_buffer)
     collisionSensor = np.reshape(auxD[1][2:], [342, 4])
-    resPlane, planeBase = vrep.simxGetObjectHandle(clientID, 'Plane', vrep.simx_opmode_oneshot_wait)
+    resPlane, planeBase = vrep.simxGetObjectHandle(clientID, 'youBot_center', vrep.simx_opmode_oneshot_wait)
     sensorPosition = vrep.simxGetObjectPosition(clientID, visionSensor, planeBase, vrep.simx_opmode_oneshot_wait)[1][:]
     sensorOrientation = vrep.simxGetObjectOrientation(clientID, visionSensor, planeBase, vrep.simx_opmode_oneshot_wait)
 
@@ -152,9 +152,9 @@ def sensorCollision(sensordata):
     sensorsLeft = np.zeros([1])
     for i in range(0, len(sensordata)):
         if sensordata[i, 0] > 0.5:
-            sensorsRight = np.vstack((sensorsRight, sensordata[i, 3]))
-        elif sensordata[i, 0] < -0.5:
             sensorsLeft = np.vstack((sensorsLeft, sensordata[i, 3]))
+        elif sensordata[i, 0] < -0.5:
+            sensorsRight = np.vstack((sensorsRight, sensordata[i, 3]))
         else:
             sensorsCenter = np.vstack((sensorsCenter, sensordata[i, 3]))
     return sensorsLeft, sensorsRight, sensorsCenter
@@ -373,22 +373,22 @@ def scanWall(clientID, wheelJoints, visionSensors):
     [left, right, center] = getSensorData(clientID, visionSensors)
 
     if (np.mean(left) <= np.mean(right)):
-        midBeam = int(len(left) * 0.7)
+        midBeam = int(len(left) * 0.75)
         min = np.amin(left[1:])
         print("min : ", min)
         for i in range(1, 90):
             rotate(clientID, wheelJoints, 1)
             [left, right, center] = getSensorData(clientID, visionSensors)
             print("beam : ", left[midBeam], "beam-min : ", left[midBeam]-min)
-            if (-0.8 < (left[midBeam] - min) < 0.8):
+            if (-0.032 < (left[midBeam] - min) < 0.032):                        # TODO: mit Genauigkeit arbeiten sinnvoll? genau genug?
                 return True
     else:
-        midBeam = int(len(right) / 2)
-        min = np.mean(np.argmin(right))
+        midBeam = int(len(right)/2)
+        min = np.mean(np.argmin(right[1:]))
         for i in range(1, 90):
-            rotate(clientID, wheelJoints, 1)
+            rotate(clientID, wheelJoints, -1)
             [left, right, center] = getSensorData(clientID, visionSensors)
-            if (-0.3 < (right[midBeam] - min) < 0.3):
+            if (-0.03 < (right[midBeam] - min) < 0.03):
                 return True
     return False
 #
