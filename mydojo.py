@@ -383,7 +383,7 @@ def scanWall(clientID, wheelJoints, visionSensors):
             [left, right, center] = getSensorData(clientID, visionSensors)
             print("beam : ", left[int(len(left) * 0.75)], "beam-min : ", left[int(len(left) * 0.75)]-minimum, "min : ", minimum, "right : ", right[int(len(right) * 0.75)])
             if (-0.08 < (left[int(len(left) * 0.75)] - minimum) < 0.08):                        # TODO: mit Genauigkeit arbeiten sinnvoll? genau genug?
-                return True
+                return True, minimum, False
     else:
         for d in right[1:]:
             if (0 < d < 1):
@@ -394,8 +394,8 @@ def scanWall(clientID, wheelJoints, visionSensors):
             [left, right, center] = getSensorData(clientID, visionSensors)
             print("beam : ", right[int(len(right) * 0.75)], "beam-min : ", right[int(len(right) * 0.75)] - minimum, "min : ", minimum)
             if (-0.08 < (right[int(len(right) * 0.75)] - minimum) < 0.08):
-                return True
-    return False
+                return True, minimum, True
+    return False, min, False
 #
 
 
@@ -410,41 +410,37 @@ def followWall(clientID, wheelJoints, visionSensors):
 
     #orient robot along wall
     while (not oriented):
-        oriented = scanWall(clientID, wheelJoints, visionSensors)
+        oriented, min, turnedLeft = scanWall(clientID, wheelJoints, visionSensors)
     print("follow the wall now - TODO")
 
-    #follow wall
-    #while(onWall):
-     #   robotPos = getRobotPos(clientID)
-     #   distanceToGoal = getDistance(goalPosition[0], goalPosition[1], robotPos[0], robotPos[1])
-
     while (onWall):
-        print('doing step')
+        [left, right, center] = getSensorData(clientID, visionSensors)
+        if(left[int(len(left) * 0.75)] < min  and turnedLeft):
+            rotate(clientID, wheelJoints, 2)
+        elif(left[int(len(left) * 0.75)] > min and turnedLeft):
+            rotate(clientID, wheelJoints, -2)
+        elif (right[int(len(right) * 0.75)] < min and not turnedLeft):
+            rotate(clientID, wheelJoints, -2)
+        elif (right[int(len(right) * 0.75)] > min and not turnedLeft):
+            rotate(clientID, wheelJoints, 2)
+
         moveStep(clientID, wheelJoints, step)
         roboPos = getRobotPos(clientID)
 
-        angleRtoG = getAngle([roboPos[0], roboPos[1]], [5, 4])
-        print('Winkel: ', roboPos[2])
-        rotate(clientID, wheelJoints, angleRtoG)
-        [left, right, center] = getSensorData(clientID, visionSensors)
+        #angleRtoG = getAngle([roboPos[0], roboPos[1]], [5, 4])
+        rotate(clientID, wheelJoints, roboPos[2])
+
         freespace = center[int(len(center) / 2)]
-        #for i in range(0, len(center)):
-         #   print(i, center[i)
 
-        #time.sleep(5)
-
-        print('freespace F =', freespace)
         rotate(clientID, wheelJoints, -roboPos[2])
+
         distanceRtoG = getDistance(roboPos[0], roboPos[1], goalPosition[0], goalPosition[1])
+
         if (distanceRtoG < dminT):
             dminT = distanceRtoG
-        print('dmin(t)= ', dminT)
-        print('d(X,T)= ', distanceRtoG)
         if (distanceRtoG - freespace <= dminT - step):
             print('leaving Wall')
             onWall = False
-
-
 #
 
 
