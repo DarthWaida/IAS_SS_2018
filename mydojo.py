@@ -16,62 +16,62 @@ np.set_printoptions(suppress=True)
 
 onWall = False
 onLine = True
-goalPos = np.empty(2, dtype=np.int)
-hasReachedGoal = False
-isOriented = False
+goalPosition = np.empty(2, dtype=np.int)
+
 
 
 #   Set up array for different wheel-velocities
 def wheelVel(forwBackVel, leftRightVel, rotVel):
     return np.array([-forwBackVel - leftRightVel + rotVel, -forwBackVel + leftRightVel + rotVel,
                      -forwBackVel - leftRightVel - rotVel, -forwBackVel + leftRightVel - rotVel])
-
-
 #
 
 
 #   Set wheel velocity
 def setWheelVel(clientID, wheelJoints, velocities):
-    vrep.simxPauseCommunication(clientID, True)
+    #vrep.simxPauseCommunication(clientID, True)
     for i in range(0, 4):
         vrep.simxSetJointTargetVelocity(clientID, wheelJoints[i], velocities[i], vrep.simx_opmode_oneshot)
-    vrep.simxPauseCommunication(clientID, False)
-
-
+    #vrep.simxPauseCommunication(clientID, False)
 #
 
 
 #   Set wheel velocity to zero
 def setWheelVelZero(clientID, wheelJoints):
-    vrep.simxPauseCommunication(clientID, True)
+    #vrep.simxPauseCommunication(clientID, True)
     for i in range(0, 4):
         vrep.simxSetJointTargetVelocity(clientID, wheelJoints[i], 0, vrep.simx_opmode_oneshot)
-    vrep.simxPauseCommunication(clientID, False)
-
-
+    #vrep.simxPauseCommunication(clientID, False)
 #
 
 
-#   Get Angle between two points    TODO!! SIN statt TAN!!!!
-def getAngle(A, B):
-    return math.degrees(np.arctan2([A[0] - B[0]],
-                                   [A[1] - B[1]]))
+#   Return robot-base
+def getObjectHandle(clientID, objectname):
+    res, base = vrep.simxGetObjectHandle(clientID, objectname, vrep.simx_opmode_oneshot_wait)
+    return base
+#
 
 
+#   Get Angle between two vectors
+def dotproduct(v1, v2):
+  return sum((a*b) for a, b in zip(v1, v2))
+def length(v):
+  return np.sqrt(dotproduct(v, v))
+def getAngle(v1, v2):
+  return -np.degrees(np.arccos(dotproduct(v1, v2) / (length(v1) * length(v2))))
 #
 
 
 #   Get distance between robot and any point (x|y)
-def getDistance(clientID, x, y):
-    robPos = getRobotPos(clientID)
-    return math.sqrt(math.pow(x - robPos[0], 2) + math.pow(y - robPos[1], 2))
+def getDistance(X, Y, x, y):
+    return np.sqrt(np.square(x - X + np.square(y - Y)))
+#
 
 
 #   True if robot in position. Else: False
-def hasReachedPosition(robotPos, dest):
+def hasReachedPosition(clientID, dest):
+    robotPos = getRobotPos(clientID)
     return (dest[0] == robotPos[0] and dest[1] == robotPos[1])
-
-
 #
 
 
@@ -88,8 +88,6 @@ def getWheelJointHandles(clientID):
     setWheelVelZero(clientID, wheelJoints)
 
     return wheelJoints
-
-
 #
 
 
@@ -108,20 +106,16 @@ def getSensorHandles(clientID):
     sensors.append(hokuyo2)
 
     return sensors
-
-
 #
 
 
 #
 def getSensorData(clientID, visionSensors):
+   # emptyBuff = bytearray()
     sensor1 = formatSensorData(clientID, visionSensors[0])
     sensor2 = formatSensorData(clientID, visionSensors[1])
     sensordata = np.vstack([sensor1, sensor2])
     return sensorCollision(sensordata)
-
-
-#
 #
 
 
@@ -129,11 +123,9 @@ def getSensorData(clientID, visionSensors):
 def formatSensorData(clientID, visionSensor):
     res, aux, auxD = vrep.simxReadVisionSensor(clientID, visionSensor, vrep.simx_opmode_buffer)
     collisionSensor = np.reshape(auxD[1][2:], [342, 4])
-    sensorPosition = \
-    vrep.simxGetObjectPosition(clientID, visionSensor, getObjectBase(clientID, 'Plane'), vrep.simx_opmode_oneshot_wait)[
-        1][:]
-    sensorOrientation = vrep.simxGetObjectOrientation(clientID, visionSensor, getObjectBase(clientID, 'Plane'),
-                                                      vrep.simx_opmode_oneshot_wait)
+    resPlane, planeBase = vrep.simxGetObjectHandle(clientID, 'Plane', vrep.simx_opmode_oneshot_wait)
+    sensorPosition = vrep.simxGetObjectPosition(clientID, visionSensor, planeBase, vrep.simx_opmode_oneshot_wait)[1][:]
+    sensorOrientation = vrep.simxGetObjectOrientation(clientID, visionSensor, planeBase, vrep.simx_opmode_oneshot_wait)
 
     alpha = sensorOrientation[1][0]
     beta = sensorOrientation[1][1]
@@ -158,8 +150,6 @@ def formatSensorData(clientID, visionSensor):
         transf_vec = np.dot(R, vec)
         collisionSensor[i, 0:3] = np.reshape(transf_vec, [1, 3]) + sensorPosition
     return collisionSensor
-
-
 #
 
 
@@ -176,21 +166,20 @@ def sensorCollision(sensordata):
         else:
             sensorsCenter = np.vstack((sensorsCenter, sensordata[i, 3]))
     return sensorsLeft, sensorsRight, sensorsCenter
-
-
 #
 
 
 #   numpy min funktion!!!! argmin
 #   Monitor Sensor-Data in seperate Thread to check if wall comes up
-def awaitWallService(event, clientID, visionSensors):
+def wallDetectionService(event, clientID, visionSensors):
     global onWall, onLine, hasReachedGoal
+
 
     while (not onWall and not hasReachedGoal):
 
         [left, right, center] = getSensorData(clientID, visionSensors)
-
-        if (np.mean(center) < 0.5 or np.mean(left) < 0.5 or np.mean(right) < 0.5):
+        print("left : ", left[int(len(left)/2)], "right : ", right[int(len(right)/2)], "center : ", center[int(len(center)/2)])
+        if ( (0.1 < center[int(len(center)/2)] < 0.5) or (0.1 < left[int(len(left)/2)] < 0.5) or (0.1 < right[int(len(right)/2)] < 0.5)):
             onWall = True
             onLine = False
             event.set()
@@ -198,30 +187,25 @@ def awaitWallService(event, clientID, visionSensors):
 
         time.sleep(0.2)
     print("Service: found wall!")
-
-
 #
 
 
 #   numpy min funktion!!!! argmin
 #   Monitor Sensor-Data in seperate Thread to check if wall comes up
-def orientRobotAlongWall(event, clientID, visionSensors):
-    global isOriented
-    i = 10
-    while (True):
-        print("i : ")
-        print(i)
-        i -= 1
-        [left, right, center] = getSensorData(clientID, visionSensors)
-        print(left[int(len(left) * 0.75)] + left[int(len(left) * 0.26)])
-        if (left[int(len(left) * 0.75)] == left[int(len(left) * 0.26)] or i == 0):
-            break
+def orientRobotAlongWall(event, clientID, visionSensors, beamIndex):
 
+    isOriented = False
+
+    while (not isOriented):
+        [left, right, center] = getSensorData(clientID, visionSensors)
+
+        if ((beamIndex[0] - beamIndex[1]) < 0.3):
+            isOriented = True
+
+        event.set()
         time.sleep(0.1)
 
     print("Service: is oriented!")
-
-
 #
 
 
@@ -252,14 +236,11 @@ def orientRobotAlongWall(event, clientID, visionSensors):
 #
 
 
-#   Return robot-base
-def getObjectBase(clientID, objectname):
-    res, base = vrep.simxGetObjectHandle(clientID, objectname, vrep.simx_opmode_oneshot_wait)
-    return base
-
-
 #   Get Robot Position
 def getRobotPos(clientID):
+
+    global goalPosition
+
     robotPosition = np.empty(3, dtype=np.float)
 
     resRobot, baseRobot = vrep.simxGetObjectHandle(clientID, 'youBot_center', vrep.simx_opmode_oneshot_wait)
@@ -268,27 +249,23 @@ def getRobotPos(clientID):
 
     robotPosition[0] = posRobot[1][0]  # Robot's x
     robotPosition[1] = posRobot[1][1]  # Robot's y
+    robotPosition[2] = getAngle([robotPosition[0], robotPosition[1]], goalPosition)
 
     return robotPosition
-
-
 #
 
 
 #   Get Goal-Position
 def getGoalPos(clientID):
-    goalPosition = np.empty(2, dtype=np.float)
+    goalHandle = getObjectHandle(clientID, 'Goal')
 
-    res, base = vrep.simxGetObjectHandle(clientID, 'Goal', vrep.simx_opmode_oneshot_wait)
-    pos = vrep.simxGetObjectPosition(clientID, base, -1, vrep.simx_opmode_oneshot_wait)
+    pos = vrep.simxGetObjectPosition(clientID, goalHandle, -1, vrep.simx_opmode_oneshot_wait)
     vrep.simxGetPingTime(clientID)
 
     goalPosition[0] = pos[1][0]
     goalPosition[1] = pos[1][1]
 
     return goalPosition
-
-
 #
 
 
@@ -302,8 +279,6 @@ def getGoalLine(start, goal):
     goalLine[2][0] = goal[0] - start[0]
     goalLine[2][1] = goal[1] - start[1]
     return goalLine
-
-
 #
 
 
@@ -340,8 +315,6 @@ def getPointOnGoalLine(goalLine, robotPosition):
     y = y1.subs(r, resR[0])
 
     return [x, y]
-
-
 #
 
 
@@ -359,8 +332,6 @@ def move(clientID, wheelJoints, distance, backward=False):
     setWheelVel(clientID, wheelJoints, wheelVelocities)
     time.sleep(rotations)
     setWheelVelZero(clientID, wheelJoints)
-
-
 #
 
 
@@ -403,26 +374,26 @@ def rotate(clientID, wheelJoints, angle):
 
 
 #   advanced move-method. move to point (x|y). If wall is ahead, service informs main-thread to stop moving robot
-def proceedToPoint(clientID, wheelJoints, visionSensors, x, y, angle):
-    distance = getDistance(clientID, x, y)
+def proceedToPoint(clientID, wheelJoints, visionSensors, x, y):
+
+    roboPos = getRobotPos(clientID)
+    distance = getDistance(roboPos[0], roboPos[1], x, y)
     diameter = 0.1 * math.pi
     rotations = 2 * (distance / diameter)
     speed = math.pi
     wheelVelocities = wheelVel(-speed, 0, 0)
 
-    rotate(clientID, wheelJoints, angle)
+    print(roboPos[0], roboPos[1], roboPos[2])
 
-    event = threading.Event()
-    service = threading.Thread(name='non-blocking',
-                               target=awaitWallService,
-                               args=(event, clientID, visionSensors))  # TODO non-blocking richtig?
-    service.start()
+    rotate(clientID, wheelJoints, roboPos[2])
+
+    wallNotFound = threading.Event()
+    wallDetection = threading.Thread(name = 'wall-detection', target=wallDetectionService, args=(wallNotFound, clientID, visionSensors))  # TODO non-blocking richtig?
+    wallDetection.start()
 
     setWheelVel(clientID, wheelJoints, wheelVelocities)
-    event.wait(rotations)
+    wallNotFound.wait(rotations)
     setWheelVelZero(clientID, wheelJoints)
-
-
 #
 
 
@@ -433,31 +404,36 @@ def moveToGoalLine(clientID, wheelJoints, sensorHandles, goalLine):
 
     angle = getAngle(robotPos, linePos)
     rotate(clientID, wheelJoints, angle)
-    proceedToPoint(clientID, wheelJoints, sensorHandles, linePos[0], linePos[1], angle)
-
-
+    proceedToPoint(clientID, wheelJoints, sensorHandles, linePos[0], linePos[1])
 #
 
 
 #   TODO: Follow wall
 def followWall(clientID, wheelJoints, visionSensors):
-    global isOriented
 
     direction = -1
+    beamIndex = np.empty(2, dtype=np.int)
 
-    event = threading.Event()
-    service = threading.Thread(name='blocking',
-                               target=orientRobotAlongWall,
-                               args=(event, clientID, visionSensors))  # TODO non-blocking richtig?
-    service.start()
 
-    while (service.is_alive()):
-        for i in range(0, 90):
-            rotate(clientID, wheelJoints, direction)
-        print("direction : ")
-        print(direction)
+    [left, right, center] = getSensorData(clientID, visionSensors)
+
+    if (np.mean(left) >= np.mean(right)):
+        beamIndex[0] = int(len(left) * 0.25)
+        beamIndex[1] = int(len(left) * 0.75)
+    else:
+        beamIndex[0] = int(len(right) * 0.25)
+        beamIndex[1] = int(len(right) * 0.75)
+
+    checkedData = threading.Event()
+    orientService = threading.Thread(name='orient-service', target=orientRobotAlongWall,
+                                     args=(checkedData, clientID, visionSensors, beamIndex))  # TODO non-blocking richtig?
+    orientService.start()
+
+    while (orientService.is_alive()):
+        for i in range(1, 90):
+            rotate(clientID, wheelJoints, 1)
+            checkedData.wait()
         direction = -direction
-
     print("follow the wall now - TODO")
 
     move(clientID, wheelJoints, 10)
@@ -492,25 +468,22 @@ def main():
         vrep.simxStartSimulation(clientID, vrep.simx_opmode_oneshot_wait)
 
         ## initialize robot
+        global goalPosition
+
         wheelJoints = getWheelJointHandles(clientID)
         goalPosition = getGoalPos(clientID)
-        robotPosition = getRobotPos(clientID)
-        goalLine = getGoalLine([robotPosition[0], robotPosition[1]], goalPosition)
+        #robotPosition = getRobotPos(clientID)
+        #goalLine = getGoalLine([robotPosition[0], robotPosition[1]], goalPosition)
         sensorHandles = getSensorHandles(clientID)
 
-        while (not hasReachedPosition(getRobotPos(clientID), goalPosition)):
+        print("Goal Position : ", goalPosition)
+        while (not hasReachedPosition(clientID, goalPosition)):
             if (not onWall and onLine):
                 print("proceed to point!")
-                emptyBuff = bytearray()
-                angle = getAngle(getRobotPos(clientID), goalPosition)
-                proceedToPoint(clientID, wheelJoints, sensorHandles, goalPosition[0], goalPosition[1], angle)
+                proceedToPoint(clientID, wheelJoints, sensorHandles, goalPosition[0], goalPosition[1])
             elif (onWall and not onLine):
-                emptyBuff = bytearray()
                 print("follow the wall!")
                 followWall(clientID, wheelJoints, sensorHandles)
-            elif (not onWall and not onLine):
-                print("move to goal-line!")
-                moveToGoalLine(clientID, wheelJoints, sensorHandles, goalLine)
             elif (onWall and onLine):
                 leaveWall()
 
