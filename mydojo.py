@@ -178,7 +178,7 @@ def wallDetectionService(event, clientID, visionSensors):
     while (not onWall):
 
         [left, right, center] = getSensorData(clientID, visionSensors)
-        print("left : ", left[int(len(left)/2)], "right : ", right[int(len(right)/2)], "center : ", center[int(len(center)/2)])
+        #print("left : ", left[int(len(left)/2)], "right : ", right[int(len(right)/2)], "center : ", center[int(len(center)/2)])
         if ( (0.1 < center[int(len(center)/2)] < 0.5) or (0.1 < left[int(len(left)/2)] < 0.5) or (0.1 < right[int(len(right)/2)] < 0.5)):
             onWall = True
             onLine = False
@@ -300,7 +300,7 @@ def getPointOnGoalLine(goalLine, robotPosition):
 
 
 #   move
-def move(clientID, wheelJoints, step, backward=False):
+def moveStep(clientID, wheelJoints, step, backward=False):
     diameter = 0.1 * math.pi
     rotations = 2 * (step / diameter)
     speed = math.pi
@@ -396,11 +396,23 @@ def moveToGoalLine(clientID, wheelJoints, sensorHandles, goalLine):
 
 
 #
-def isOriented(clientID, visionSensors, beamIndex):
+def isOriented(clientID, visionSensors):
+
     [left, right, center] = getSensorData(clientID, visionSensors)
 
-    if ((beamIndex[0] - beamIndex[1]) < 0.09):
+    if (np.mean(left) >= np.mean(right)):
+        beamA = left[int(len(left) * 0.1)]
+        beamB = left[int(len(left) * 0.2)]
+    else:
+        beamA = right[int(len(right) * 0.1)]
+        beamB = right[int(len(right) * 0.2)]
+
+    print("beam A : ", beamA, "beam B : ", beamB)
+
+    if (-0.38 < (beamA - beamB) < 0.38):
         return True
+
+    return False
 #
 
 
@@ -408,22 +420,11 @@ def isOriented(clientID, visionSensors, beamIndex):
 def followWall(clientID, wheelJoints, visionSensors):
     oriented = False
     direction = -1
-    beamIndex = np.empty(2, dtype=np.int)
-
-
-    [left, right, center] = getSensorData(clientID, visionSensors)
-
-    if (np.mean(left) >= np.mean(right)):
-        beamIndex[0] = int(len(left) * 0.2)
-        beamIndex[1] = int(len(left) * 0.4)
-    else:
-        beamIndex[0] = int(len(right) * 0.2)
-        beamIndex[1] = int(len(right) * 0.4)
 
     while (not oriented):
-        for i in range(1, 90):
+        for i in range(1, 45):
             rotate(clientID, wheelJoints, 1)
-            oriented = isOriented(clientID, visionSensors, beamIndex)
+            oriented = isOriented(clientID, visionSensors)
             if(oriented):
                 break
         direction = -direction
@@ -431,9 +432,7 @@ def followWall(clientID, wheelJoints, visionSensors):
 
     #moveInSteps(clientID, wheelJoints, visionSensors)
 
-    move(clientID, wheelJoints, 10)
-
-
+    moveStep(clientID, wheelJoints, 10)
 #
 
 
@@ -445,8 +444,6 @@ def leaveWall():
     onLine = True
 
     print("leave the wall to follow line")
-
-
 #
 
 
