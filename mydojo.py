@@ -371,10 +371,14 @@ def proceedToPoint(clientID, wheelJoints, visionSensors, x, y):
 #
 def scanWall(clientID, wheelJoints, visionSensors):
     [left, right, center] = getSensorData(clientID, visionSensors)
+    data = np.empty(1, dtype=np.float)
 
     if (np.mean(left) <= np.mean(right)):
         midBeam = int(len(left) * 0.75)
-        min = np.amin(left[1:])
+        for d in left:
+            if(d < 0.8 and d > 0):
+                np.append(data, d)
+        min = np.amin(data)
         print("min : ", min)
         for i in range(1, 90):
             rotate(clientID, wheelJoints, 1)
@@ -383,12 +387,16 @@ def scanWall(clientID, wheelJoints, visionSensors):
             if (-0.032 < (left[midBeam] - min) < 0.032):                        # TODO: mit Genauigkeit arbeiten sinnvoll? genau genug?
                 return True
     else:
-        midBeam = int(len(right)/2)
-        min = np.mean(np.argmin(right[1:]))
+        midBeam = int(len(right) * 0.75)
+        for d in right:
+            if(d < 0.8 and d > 0):
+                np.append(data, d)
+        min = np.amin(data)
         for i in range(1, 90):
             rotate(clientID, wheelJoints, -1)
             [left, right, center] = getSensorData(clientID, visionSensors)
-            if (-0.03 < (right[midBeam] - min) < 0.03):
+            print("beam : ", right[midBeam], "beam-min : ", right[midBeam] - min)
+            if (-0.032 < (right[midBeam] - min) < 0.032):
                 return True
     return False
 #
