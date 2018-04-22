@@ -368,35 +368,29 @@ def proceedToPoint(clientID, wheelJoints, visionSensors, x, y):
 #
 
 
-#   Return True if robot is oriented along wall, using the distance of two sensorbeams. Else: False
-def isOriented(clientID, visionSensors):
-
-    [left, right, center] = getSensorData(clientID, visionSensors)
-
-    if (np.mean(left) >= np.mean(right)):
-        beamA = left[int(len(left) * 0.1)]
-        beamB = left[int(len(left) * 0.2)]
-    else:
-        beamA = right[int(len(right) * 0.1)]
-        beamB = right[int(len(right) * 0.2)]
-
-    if (-0.38 < (beamA - beamB) < 0.38):
-        return True
-
-    return False
-#
-
-
 #
 def scanWall(clientID, wheelJoints, visionSensors):
-    for i in range(1, 90):
-        rotate(clientID, wheelJoints, 1)
-        if (isOriented(clientID, visionSensors)):
-            return True
-    for i in range(1, 90):
-        rotate(clientID, wheelJoints, -1)
-        if (isOriented(clientID, visionSensors)):
-            return True
+    [left, right, center] = getSensorData(clientID, visionSensors)
+
+    if (np.mean(left) <= np.mean(right)):
+        midBeam = int(len(left) * 0.7)
+        min = np.amin(left[1:])
+        print(np.argmin(left[1:]))
+        print("min : ", min)
+        for i in range(1, 90):
+            rotate(clientID, wheelJoints, 1)
+            [left, right, center] = getSensorData(clientID, visionSensors)
+            print("beam : ", left[midBeam], "beam-min : ", left[midBeam]-min)
+            if (-0.05 < (left[midBeam] - min) < 0.05):
+                return True
+    else:
+        midBeam = int(len(right) / 2)
+        min = np.mean(np.argmin(right))
+        for i in range(1, 90):
+            rotate(clientID, wheelJoints, 1)
+            [left, right, center] = getSensorData(clientID, visionSensors)
+            if (-0.3 < (right[midBeam] - min) < 0.3):
+                return True
     return False
 #
 
@@ -411,9 +405,9 @@ def followWall(clientID, wheelJoints, visionSensors):
     print("follow the wall now - TODO")
 
     #follow wall
-    while(onWall):
-        robotPos = getRobotPos(clientID)
-        distanceToGoal = getDistance(goalPosition[0], goalPosition[1], robotPos[0], robotPos[1])
+    #while(onWall):
+     #   robotPos = getRobotPos(clientID)
+     #   distanceToGoal = getDistance(goalPosition[0], goalPosition[1], robotPos[0], robotPos[1])
 
     moveStep(clientID, wheelJoints, 10)
 
