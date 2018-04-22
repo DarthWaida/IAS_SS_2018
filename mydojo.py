@@ -172,10 +172,10 @@ def sensorCollision(sensordata):
 #   numpy min funktion!!!! argmin
 #   Monitor Sensor-Data in seperate Thread to check if wall comes up
 def wallDetectionService(event, clientID, visionSensors):
-    global onWall, onLine, hasReachedGoal
+    global onWall, onLine
 
 
-    while (not onWall and not hasReachedGoal):
+    while (not onWall):
 
         [left, right, center] = getSensorData(clientID, visionSensors)
         print("left : ", left[int(len(left)/2)], "right : ", right[int(len(right)/2)], "center : ", center[int(len(center)/2)])
@@ -187,25 +187,6 @@ def wallDetectionService(event, clientID, visionSensors):
 
         time.sleep(0.2)
     print("Service: found wall!")
-#
-
-
-#   numpy min funktion!!!! argmin
-#   Monitor Sensor-Data in seperate Thread to check if wall comes up
-def orientRobotAlongWall(event, clientID, visionSensors, beamIndex):
-
-    isOriented = False
-
-    while (not isOriented):
-        [left, right, center] = getSensorData(clientID, visionSensors)
-
-        if ((beamIndex[0] - beamIndex[1]) < 0.3):
-            isOriented = True
-
-        event.set()
-        time.sleep(0.1)
-
-    print("Service: is oriented!")
 #
 
 
@@ -319,9 +300,9 @@ def getPointOnGoalLine(goalLine, robotPosition):
 
 
 #   move
-def move(clientID, wheelJoints, distance, backward=False):
+def move(clientID, wheelJoints, step, backward=False):
     diameter = 0.1 * math.pi
-    rotations = 2 * (distance / diameter)
+    rotations = 2 * (step / diameter)
     speed = math.pi
 
     if (not backward):
@@ -397,6 +378,12 @@ def proceedToPoint(clientID, wheelJoints, visionSensors, x, y):
 #
 
 
+#
+#def moveInSteps(clientID, wheelJoints, visionSensors, step):
+
+#
+
+
 #   Leave wall and move back to initially evaluated goal-line
 def moveToGoalLine(clientID, wheelJoints, sensorHandles, goalLine):
     robotPos = getRobotPos(clientID)
@@ -408,9 +395,18 @@ def moveToGoalLine(clientID, wheelJoints, sensorHandles, goalLine):
 #
 
 
+#
+def isOriented(clientID, visionSensors, beamIndex):
+    [left, right, center] = getSensorData(clientID, visionSensors)
+
+    if ((beamIndex[0] - beamIndex[1]) < 0.09):
+        return True
+#
+
+
 #   TODO: Follow wall
 def followWall(clientID, wheelJoints, visionSensors):
-
+    oriented = False
     direction = -1
     beamIndex = np.empty(2, dtype=np.int)
 
@@ -418,23 +414,22 @@ def followWall(clientID, wheelJoints, visionSensors):
     [left, right, center] = getSensorData(clientID, visionSensors)
 
     if (np.mean(left) >= np.mean(right)):
-        beamIndex[0] = int(len(left) * 0.25)
-        beamIndex[1] = int(len(left) * 0.75)
+        beamIndex[0] = int(len(left) * 0.2)
+        beamIndex[1] = int(len(left) * 0.4)
     else:
-        beamIndex[0] = int(len(right) * 0.25)
-        beamIndex[1] = int(len(right) * 0.75)
+        beamIndex[0] = int(len(right) * 0.2)
+        beamIndex[1] = int(len(right) * 0.4)
 
-    checkedData = threading.Event()
-    orientService = threading.Thread(name='orient-service', target=orientRobotAlongWall,
-                                     args=(checkedData, clientID, visionSensors, beamIndex))  # TODO non-blocking richtig?
-    orientService.start()
-
-    while (orientService.is_alive()):
+    while (not oriented):
         for i in range(1, 90):
             rotate(clientID, wheelJoints, 1)
-            checkedData.wait()
+            oriented = isOriented(clientID, visionSensors, beamIndex)
+            if(oriented):
+                break
         direction = -direction
     print("follow the wall now - TODO")
+
+    #moveInSteps(clientID, wheelJoints, visionSensors)
 
     move(clientID, wheelJoints, 10)
 
