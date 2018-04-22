@@ -402,6 +402,11 @@ def scanWall(clientID, wheelJoints, visionSensors):
 #   TODO: Follow wall
 def followWall(clientID, wheelJoints, visionSensors):
     oriented = False
+    global onWall
+    global goalPosition
+    step = 1
+    dminT = 100
+    goalPos = getGoalPos(clientID)
 
     #orient robot along wall
     while (not oriented):
@@ -413,7 +418,32 @@ def followWall(clientID, wheelJoints, visionSensors):
      #   robotPos = getRobotPos(clientID)
      #   distanceToGoal = getDistance(goalPosition[0], goalPosition[1], robotPos[0], robotPos[1])
 
-    moveStep(clientID, wheelJoints, 10)
+    while (onWall):
+        print('doing step')
+        moveStep(clientID, wheelJoints, step)
+        roboPos = getRobotPos(clientID)
+
+        angleRtoG = getAngle([roboPos[0], roboPos[1]], [5, 4])
+        print('Winkel: ', roboPos[2])
+        rotate(clientID, wheelJoints, angleRtoG)
+        [left, right, center] = getSensorData(clientID, visionSensors)
+        freespace = center[int(len(center) / 2)]
+        #for i in range(0, len(center)):
+         #   print(i, center[i)
+
+        #time.sleep(5)
+
+        print('freespace F =', freespace)
+        rotate(clientID, wheelJoints, -roboPos[2])
+        distanceRtoG = getDistance(roboPos[0], roboPos[1], goalPosition[0], goalPosition[1])
+        if (distanceRtoG < dminT):
+            dminT = distanceRtoG
+        print('dmin(t)= ', dminT)
+        print('d(X,T)= ', distanceRtoG)
+        if (distanceRtoG - freespace <= dminT - step):
+            print('leaving Wall')
+            onWall = False
+
 
 #
 
