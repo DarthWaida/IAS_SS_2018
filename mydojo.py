@@ -482,14 +482,13 @@ def main():
 
         print("Goal Position : ", goalPosition)
         while (not hasReachedPosition(clientID, goalPosition)):
-            if (not onWall and onLine):
+            if (not onWall):
                 print("proceed to point!")
                 proceedToPoint(clientID, wheelJoints, sensorHandles, goalPosition[0], goalPosition[1])
-            elif (onWall and not onLine):
+            elif (onWall):
                 print("follow the wall!")
                 followWall(clientID, wheelJoints, sensorHandles)
-            elif (onWall and onLine):
-                leaveWall()
+
 
         # Stop simulation:
         vrep.simxStopSimulation(clientID, vrep.simx_opmode_oneshot_wait)
