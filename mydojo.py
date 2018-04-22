@@ -29,19 +29,15 @@ def wheelVel(forwBackVel, leftRightVel, rotVel):
 
 #   Set wheel velocity
 def setWheelVel(clientID, wheelJoints, velocities):
-    #vrep.simxPauseCommunication(clientID, True)
     for i in range(0, 4):
         vrep.simxSetJointTargetVelocity(clientID, wheelJoints[i], velocities[i], vrep.simx_opmode_oneshot)
-    #vrep.simxPauseCommunication(clientID, False)
 #
 
 
 #   Set wheel velocity to zero
 def setWheelVelZero(clientID, wheelJoints):
-    #vrep.simxPauseCommunication(clientID, True)
     for i in range(0, 4):
         vrep.simxSetJointTargetVelocity(clientID, wheelJoints[i], 0, vrep.simx_opmode_oneshot)
-    #vrep.simxPauseCommunication(clientID, False)
 #
 
 
@@ -53,12 +49,8 @@ def getObjectHandle(clientID, objectname):
 
 
 #   Get Angle between two vectors
-def dotproduct(v1, v2):
-  return sum((a*b) for a, b in zip(v1, v2))
-def length(v):
-  return np.sqrt(dotproduct(v, v))
 def getAngle(v1, v2):
-  return -np.degrees(np.arccos(dotproduct(v1, v2) / (length(v1) * length(v2))))
+  return -np.degrees(np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))))
 #
 
 
@@ -178,7 +170,7 @@ def wallDetectionService(event, clientID, visionSensors):
     while (not onWall):
 
         [left, right, center] = getSensorData(clientID, visionSensors)
-        #print("left : ", left[int(len(left)/2)], "right : ", right[int(len(right)/2)], "center : ", center[int(len(center)/2)])
+        print("left and center : ",center[int(len(center)-1)],right[1])
         if ( (0.1 < center[int(len(center)/2)] < 0.5) or (0.1 < left[int(len(left)/2)] < 0.5) or (0.1 < right[int(len(right)/2)] < 0.5)):
             onWall = True
             onLine = False
@@ -330,8 +322,6 @@ def moveSideways(clientID, wheelJoints, distance, left=False):
     setWheelVel(clientID, wheelJoints, wheelVelocities)
     time.sleep(rotations)
     setWheelVelZero(clientID, wheelJoints)
-
-
 #
 
 
@@ -378,24 +368,7 @@ def proceedToPoint(clientID, wheelJoints, visionSensors, x, y):
 #
 
 
-#
-#def moveInSteps(clientID, wheelJoints, visionSensors, step):
-
-#
-
-
-#   Leave wall and move back to initially evaluated goal-line
-def moveToGoalLine(clientID, wheelJoints, sensorHandles, goalLine):
-    robotPos = getRobotPos(clientID)
-    linePos = getPointOnGoalLine(goalLine, robotPos)
-
-    angle = getAngle(robotPos, linePos)
-    rotate(clientID, wheelJoints, angle)
-    proceedToPoint(clientID, wheelJoints, sensorHandles, linePos[0], linePos[1])
-#
-
-
-#
+#   Return True if robot is oriented along wall, using the distance of two sensorbeams. Else: False
 def isOriented(clientID, visionSensors):
 
     [left, right, center] = getSensorData(clientID, visionSensors)
@@ -407,8 +380,6 @@ def isOriented(clientID, visionSensors):
         beamA = right[int(len(right) * 0.1)]
         beamB = right[int(len(right) * 0.2)]
 
-    print("beam A : ", beamA, "beam B : ", beamB)
-
     if (-0.38 < (beamA - beamB) < 0.38):
         return True
 
@@ -416,23 +387,36 @@ def isOriented(clientID, visionSensors):
 #
 
 
+#
+def scanWall(clientID, wheelJoints, visionSensors):
+    for i in range(1, 90):
+        rotate(clientID, wheelJoints, 1)
+        if (isOriented(clientID, visionSensors)):
+            return True
+    for i in range(1, 90):
+        rotate(clientID, wheelJoints, -1)
+        if (isOriented(clientID, visionSensors)):
+            return True
+    return False
+#
+
+
 #   TODO: Follow wall
 def followWall(clientID, wheelJoints, visionSensors):
     oriented = False
-    direction = -1
 
+    #orient robot along wall
     while (not oriented):
-        for i in range(1, 45):
-            rotate(clientID, wheelJoints, 1)
-            oriented = isOriented(clientID, visionSensors)
-            if(oriented):
-                break
-        direction = -direction
+        oriented = scanWall(clientID, wheelJoints, visionSensors)
     print("follow the wall now - TODO")
 
-    #moveInSteps(clientID, wheelJoints, visionSensors)
+    #follow wall
+    while(onWall):
+        robotPos = getRobotPos(clientID)
+        distanceToGoal = getDistance(goalPosition[0], goalPosition[1], robotPos[0], robotPos[1])
 
     moveStep(clientID, wheelJoints, 10)
+
 #
 
 
