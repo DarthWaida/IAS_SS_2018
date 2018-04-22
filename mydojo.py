@@ -375,13 +375,12 @@ def scanWall(clientID, wheelJoints, visionSensors):
     if (np.mean(left) <= np.mean(right)):
         midBeam = int(len(left) * 0.7)
         min = np.amin(left[1:])
-        print(np.argmin(left[1:]))
         print("min : ", min)
         for i in range(1, 90):
             rotate(clientID, wheelJoints, 1)
             [left, right, center] = getSensorData(clientID, visionSensors)
             print("beam : ", left[midBeam], "beam-min : ", left[midBeam]-min)
-            if (-0.05 < (left[midBeam] - min) < 0.05):
+            if (-0.8 < (left[midBeam] - min) < 0.8):
                 return True
     else:
         midBeam = int(len(right) / 2)
