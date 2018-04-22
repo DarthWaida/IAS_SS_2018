@@ -371,32 +371,29 @@ def proceedToPoint(clientID, wheelJoints, visionSensors, x, y):
 #
 def scanWall(clientID, wheelJoints, visionSensors):
     [left, right, center] = getSensorData(clientID, visionSensors)
-    data = np.empty(1, dtype=np.float)
+    data = []
 
-    if (np.mean(left) <= np.mean(right)):
-        midBeam = int(len(left) * 0.75)
-        for d in left:
-            if(d < 0.8 and d > 0):
-                np.append(data, d)
-        min = np.amin(data)
-        print("min : ", min)
+    if ( np.mean(left[1:]) < np.mean(right[1:])):
+        for d in left[1:]:
+            if(0 < d < 1):
+                data.append(d)
+        minimum = min(data)
         for i in range(1, 90):
             rotate(clientID, wheelJoints, 1)
             [left, right, center] = getSensorData(clientID, visionSensors)
-            print("beam : ", left[midBeam], "beam-min : ", left[midBeam]-min)
-            if (-0.032 < (left[midBeam] - min) < 0.032):                        # TODO: mit Genauigkeit arbeiten sinnvoll? genau genug?
+            print("beam : ", left[int(len(left) * 0.75)], "beam-min : ", left[int(len(left) * 0.75)]-minimum, "min : ", minimum, "right : ", right[int(len(right) * 0.75)])
+            if (-0.08 < (left[int(len(left) * 0.75)] - minimum) < 0.08):                        # TODO: mit Genauigkeit arbeiten sinnvoll? genau genug?
                 return True
     else:
-        midBeam = int(len(right) * 0.75)
-        for d in right:
-            if(d < 0.8 and d > 0):
-                np.append(data, d)
-        min = np.amin(data)
+        for d in right[1:]:
+            if (0 < d < 1):
+                data.append(d)
+        minimum = min(data)
         for i in range(1, 90):
             rotate(clientID, wheelJoints, -1)
             [left, right, center] = getSensorData(clientID, visionSensors)
-            print("beam : ", right[midBeam], "beam-min : ", right[midBeam] - min)
-            if (-0.032 < (right[midBeam] - min) < 0.032):
+            print("beam : ", right[int(len(right) * 0.75)], "beam-min : ", right[int(len(right) * 0.75)] - minimum, "min : ", minimum)
+            if (-0.08 < (right[int(len(right) * 0.75)] - minimum) < 0.08):
                 return True
     return False
 #
